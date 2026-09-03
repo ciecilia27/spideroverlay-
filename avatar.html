@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Avatar Cam — Spiderman theme</title>
+<style>
+  *{ box-sizing:border-box; margin:0; padding:0; }
+
+  html,body{
+    width:100%;
+    height:100%;
+    background:transparent;
+    overflow:hidden;
+  }
+
+  .stage{
+    position:fixed;
+    inset:0;
+    width:100vw;
+    height:100vh;
+    pointer-events:none;
+  }
+
+  /* ---------- Avatar pengganti face cam, mulut gerak ngikutin suara mic ---------- */
+  .avatar-cam{
+    position:absolute;
+    left:50%; top:6vh;
+    transform:translateX(-50%);
+    width:32vh;
+  }
+
+  /* jaring laba-laba tipis di belakang avatar, dekorasi tema */
+  .web-bg{
+    position:absolute;
+    left:50%; top:50%;
+    transform:translate(-50%,-50%);
+    width:150%;
+    height:150%;
+    opacity:0.16;
+    z-index:0;
+  }
+
+  /* cincin glow merah di belakang avatar, nyala pas lagi ngomong */
+  .glow-ring{
+    position:absolute;
+    left:50%; top:50%;
+    transform:translate(-50%,-50%);
+    width:88%;
+    height:88%;
+    border-radius:50%;
+    background:radial-gradient(circle, rgba(224,26,26,0.45) 0%, rgba(224,26,26,0) 70%);
+    z-index:0;
+    opacity:0.5;
+    transition:opacity 0.15s ease, transform 0.15s ease;
+  }
+  .avatar-cam.talking .glow-ring{
+    opacity:1;
+    transform:translate(-50%,-50%) scale(1.08);
+  }
+
+  .avatar-cam img.avatar-img{
+    position:relative;
+    display:block;
+    width:100%;
+    height:auto;
+    z-index:1;
+    filter:drop-shadow(0 1vh 2.2vh rgba(0,0,0,0.55));
+  }
+  .avatar-cam .mouth-layer{
+    position:absolute;
+    left:46.75%;
+    top:45.05%;
+    transform:translate(-50%,-50%);
+    width:10.06%;
+    height:auto;
+    opacity:0;
+    transition:opacity 0.05s linear;
+    z-index:2;
+  }
+  .avatar-cam .mouth-layer.mouth-b{
+    width:6.49%;
+  }
+  .avatar-cam .mouth-layer.show{
+    opacity:1;
+  }
+
+  /* label nama kecil di bawah avatar, aksen merah-hitam ala Spiderman */
+  .hero-tag{
+    position:absolute;
+    left:50%; top:76vh;
+    transform:translateX(-50%);
+    display:flex;
+    align-items:center;
+    gap:0.8vh;
+    background:linear-gradient(135deg, #1a1a1a, #3a0000);
+    border:0.3vh solid #e01a1a;
+    border-radius:1vh;
+    padding:0.8vh 2vh;
+    box-shadow:0 0.6vh 1.6vh rgba(224,26,26,0.45), inset 0 0 1vh rgba(224,26,26,0.25);
+  }
+  .hero-tag .dot{
+    width:1vh; height:1vh;
+    border-radius:50%;
+    background:#e01a1a;
+    box-shadow:0 0 1vh #e01a1a;
+    animation:hero-pulse 1.3s ease-in-out infinite;
+  }
+  @keyframes hero-pulse{
+    0%,100%{ opacity:1; transform:scale(1); }
+    50%{ opacity:0.5; transform:scale(1.4); }
+  }
+  .hero-tag .text{
+    font-family:'Arial Black', 'Arial', sans-serif;
+    font-weight:900;
+    font-style:italic;
+    letter-spacing:0.08em;
+    font-size:2vh;
+    color:#ffffff;
+    text-shadow:0 0 0.6vh #e01a1a;
+  }
+
+  /* partikel merah kecil yang sesekali muncul, nuansa "web-shooter spark" */
+  .spark{
+    position:absolute;
+    font-size:1.6vh;
+    opacity:0;
+    pointer-events:none;
+    animation:sparkFloat 2.4s ease-out forwards;
+    z-index:3;
+  }
+  @keyframes sparkFloat{
+    0%{ opacity:0; transform:translate(0,0) scale(0.5) rotate(0deg); }
+    15%{ opacity:0.9; }
+    100%{ opacity:0; transform:translate(var(--dx,1vh), -6vh) scale(1.1) rotate(180deg); }
+  }
+</style>
+</head>
+<body>
+
+<div class="stage" id="stage">
+
+  <div class="avatar-cam" id="avatarCam">
+    <svg class="web-bg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+      <g stroke="#e01a1a" stroke-width="0.6" fill="none">
+        <circle cx="100" cy="100" r="30"/>
+        <circle cx="100" cy="100" r="55"/>
+        <circle cx="100" cy="100" r="80"/>
+        <line x1="100" y1="100" x2="100" y2="0"/>
+        <line x1="100" y1="100" x2="100" y2="200"/>
+        <line x1="100" y1="100" x2="0" y2="100"/>
+        <line x1="100" y1="100" x2="200" y2="100"/>
+        <line x1="100" y1="100" x2="29" y2="29"/>
+        <line x1="100" y1="100" x2="171" y2="29"/>
+        <line x1="100" y1="100" x2="29" y2="171"/>
+        <line x1="100" y1="100" x2="171" y2="171"/>
+      </g>
+    </svg>
+    <div class="glow-ring"></div>
+    <img class="avatar-img" src="avatar.png" alt="avatar">
+    <img class="mouth-layer mouth-a" id="mouthA" src="mouth_open_1.png" alt="">
+    <img class="mouth-layer mouth-b" id="mouthB" src="mouth_open_2.png" alt="">
+  </div>
+
+</div>
+
+<script>
+  /* ============================================================
+     🎤 LIP-SYNC — baca volume mic pakai RMS (lebih peka ke suara
+     ngomong biasa dibanding rata-rata frekuensi), plus kalibrasi
+     otomatis noise ruangan ~1.2 detik pertama biar threshold-nya
+     nyesuaian sendiri ke suara sekitar (AC, kipas, dsb) tapi tetap
+     peka pas ngomong normal — nggak perlu teriak.
+     Butuh izin akses mic sekali (di OBS/TikTok Studio: klik kanan
+     browser source ini → "Interact" → izinkan mic saat browser
+     minta). Setelah itu, izinnya keinget terus tiap live.
+     ============================================================ */
+  const mouthA = document.getElementById('mouthA');
+  const mouthB = document.getElementById('mouthB');
+  const avatarCamEl = document.getElementById('avatarCam');
+
+  const CALIBRATION_MS = 1200;    // durasi ukur noise ruangan di awal
+  const MARGIN_ABOVE_NOISE = 0.018; // makin kecil = makin sensitif di atas noise dasar
+  const MIN_THRESHOLD = 0.012;    // batas bawah biar ga kepicu noise diam sama sekali
+  const MAX_THRESHOLD = 0.09;     // batas atas biar ga jadi keterlaluan gak sensitif
+  const SILENCE_HOLD_MS = 150;    // jeda dikit biar ga kedip2 pas suara putus2
+  const SMOOTHING = 0.35;         // 0-1, makin gede makin halus tapi agak lag
+
+  let currentMouthShowsA = true;
+  let lastLoudTime = 0;
+  let lastShapeSwitch = 0;
+  let smoothedLevel = 0;
+  let talkThreshold = MARGIN_ABOVE_NOISE; // nilai sementara sebelum kalibrasi selesai
+  let calibrating = true;
+  let calibSamples = [];
+
+  function setMouthVisible(visible){
+    avatarCamEl.classList.toggle('talking', visible);
+    if (visible){
+      const now = performance.now();
+      if (now - lastShapeSwitch > 130){
+        currentMouthShowsA = !currentMouthShowsA;
+        lastShapeSwitch = now;
+      }
+      mouthA.classList.toggle('show', currentMouthShowsA);
+      mouthB.classList.toggle('show', !currentMouthShowsA);
+    } else {
+      mouthA.classList.remove('show');
+      mouthB.classList.remove('show');
+    }
+  }
+
+  function computeRMS(data){
+    // data: Uint8Array time-domain, center di 128
+    let sumSquares = 0;
+    for (let i = 0; i < data.length; i++){
+      const norm = (data[i] - 128) / 128;
+      sumSquares += norm * norm;
+    }
+    return Math.sqrt(sumSquares / data.length);
+  }
+
+  async function startMicLipSync(){
+    try{
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const source = audioCtx.createMediaStreamSource(stream);
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 1024;
+      source.connect(analyser);
+
+      const data = new Uint8Array(analyser.fftSize);
+      const calibStart = performance.now();
+
+      function tick(){
+        analyser.getByteTimeDomainData(data);
+        const rms = computeRMS(data);
+
+        // smoothing biar level ga meletik-letik
+        smoothedLevel = smoothedLevel + (rms - smoothedLevel) * (1 - SMOOTHING);
+
+        const now = performance.now();
+
+        if (calibrating){
+          if (now - calibStart < CALIBRATION_MS){
+            calibSamples.push(smoothedLevel);
+          } else {
+            const noiseFloor = calibSamples.length
+              ? calibSamples.reduce((a, b) => a + b, 0) / calibSamples.length
+              : 0.005;
+            talkThreshold = Math.min(
+              MAX_THRESHOLD,
+              Math.max(MIN_THRESHOLD, noiseFloor + MARGIN_ABOVE_NOISE)
+            );
+            calibrating = false;
+            console.log('[LipSync] kalibrasi selesai, noiseFloor=' + noiseFloor.toFixed(4) + ' threshold=' + talkThreshold.toFixed(4));
+          }
+        } else {
+          if (smoothedLevel > talkThreshold){
+            lastLoudTime = now;
+            setMouthVisible(true);
+          } else if (now - lastLoudTime > SILENCE_HOLD_MS){
+            setMouthVisible(false);
+          }
+        }
+
+        requestAnimationFrame(tick);
+      }
+      tick();
+      console.log('[LipSync] mic tersambung ✅, kalibrasi noise ruangan ' + (CALIBRATION_MS/1000) + 'detik...');
+    } catch(e){
+      console.warn('[LipSync] gagal akses mic — di OBS klik kanan source ini → Interact, lalu izinkan mic.', e);
+    }
+  }
+  startMicLipSync();
+
+  /* partikel spark merah sesekali */
+  const stage = document.getElementById('stage');
+  function spawnSpark(){
+    const s = document.createElement('span');
+    s.className = 'spark';
+    s.textContent = ['🕸️','✨','💥'][Math.floor(Math.random()*3)];
+    const camRect = avatarCamEl.getBoundingClientRect();
+    s.style.left = (camRect.left + camRect.width * (0.2 + Math.random()*0.6)) + 'px';
+    s.style.top = (camRect.top + camRect.height * (0.1 + Math.random()*0.3)) + 'px';
+    s.style.setProperty('--dx', (Math.random()*4 - 2) + 'vh');
+    stage.appendChild(s);
+    setTimeout(() => s.remove(), 2500);
+  }
+  setInterval(spawnSpark, 4000 + Math.random()*3000);
+</script>
+
+</body>
+</html>
